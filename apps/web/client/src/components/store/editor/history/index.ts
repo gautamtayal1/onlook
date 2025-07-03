@@ -106,33 +106,58 @@ export class HistoryManager {
     };
 
     undo = (): Action | null => {
+        console.log('📚 HistoryManager.undo() - CALLED');
+        console.log('📚 Undo stack length:', this.undoStack);
+        console.log('📚 Undo stack content:', this.undoStack.slice()); // Convert to plain array
+        console.log('📚 Redo stack length:', this.redoStack);
+        console.log('📚 Redo stack content:', this.redoStack.slice()); // Convert to plain array
+        
         if (this.inTransaction.type === TransactionType.IN_TRANSACTION) {
+            console.log('📚 In transaction, committing first...');
             this.commitTransaction();
         }
 
         const top = this.undoStack.pop();
         if (top == null) {
+            console.log('❌ HistoryManager.undo() - No action to undo');
             return null;
         }
+        
+        console.log('📚 Original action to undo:', JSON.parse(JSON.stringify(top))); // Convert to plain object
         const action = undoAction(top);
+        console.log('📚 Reversed action to apply:', JSON.parse(JSON.stringify(action))); // Convert to plain object
 
         this.redoStack.push(top);
+        console.log('📚 Moved original action to redo stack');
 
         return action;
     };
 
     redo = (): Action | null => {
+        console.log('📚 HistoryManager.redo() - CALLED');
+        console.log('📚 Undo stack length:', this.undoStack.length);
+        console.log('📚 Undo stack content:', this.undoStack.slice()); // Convert to plain array
+        console.log('📚 Redo stack length:', this.redoStack.length);
+        console.log('📚 Redo stack content:', this.redoStack.slice()); // Convert to plain array
+        
         if (this.inTransaction.type === TransactionType.IN_TRANSACTION) {
+            console.log('📚 In transaction, committing first...');
             this.commitTransaction();
         }
 
         const top = this.redoStack.pop();
         if (top == null) {
+            console.log('❌ HistoryManager.redo() - No action to redo');
             return null;
         }
 
+        console.log('📚 Original action to redo:', JSON.parse(JSON.stringify(top))); // Convert to plain object
         const action = transformRedoAction(top);
+        console.log('📚 Transformed action to apply:', JSON.parse(JSON.stringify(action))); // Convert to plain object
+        
         this.undoStack.push(action);
+        console.log('📚 Moved transformed action to undo stack');
+        
         return action;
     };
 

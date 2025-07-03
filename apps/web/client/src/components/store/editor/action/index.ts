@@ -28,65 +28,96 @@ export class ActionManager {
     }
 
     async undo() {
+        console.log('⏪ ActionManager.undo() - PRESSED UNDO BUTTON');
         const action = this.editorEngine.history.undo();
 
         if (action == null) {
+            console.log('❌ ActionManager.undo() - No action to undo');
             return;
         }
+        
+        console.log('🔄 ActionManager.undo() - Got action from history:', action);
         await this.dispatch(action);
         await this.editorEngine.code.write(action);
         sendAnalytics('undo');
+        console.log('✅ ActionManager.undo() - UNDO COMPLETE');
     }
 
     async redo() {
+        console.log('⏩ ActionManager.redo() - PRESSED REDO BUTTON');
         const action = this.editorEngine.history.redo();
         if (action == null) {
+            console.log('❌ ActionManager.redo() - No action to redo');
             return;
         }
+        
+        console.log('🔄 ActionManager.redo() - Got action from history:', action);
         await this.dispatch(action);
         await this.editorEngine.code.write(action);
         sendAnalytics('redo');
+        console.log('✅ ActionManager.redo() - REDO COMPLETE');
     }
 
     private async dispatch(action: Action) {
+        console.log('🚀 ActionManager.dispatch() - CALLED');
+        console.log('🚀 Action type:', action.type);
+        console.log('🚀 Full action:', action);
+        
         switch (action.type) {
             case 'update-style':
+                console.log('🚀 Dispatching to updateStyle()');
                 await this.updateStyle(action);
                 break;
             case 'insert-element':
+                console.log('🚀 Dispatching to insertElement()');
                 await this.insertElement(action);
                 break;
             case 'remove-element':
+                console.log('🚀 Dispatching to removeElement()');
                 await this.removeElement(action);
                 break;
             case 'move-element':
+                console.log('🚀 Dispatching to moveElement()');
                 await this.moveElement(action);
                 break;
             case 'edit-text':
+                console.log('🚀 Dispatching to editText()');
                 await this.editText(action);
                 break;
             case 'group-elements':
+                console.log('🚀 Dispatching to groupElements()');
                 await this.groupElements(action);
                 break;
             case 'ungroup-elements':
+                console.log('🚀 Dispatching to ungroupElements()');
                 await this.ungroupElements(action);
                 break;
             case 'write-code':
+                console.log('🚀 Skipping write-code action');
                 break;
             case 'insert-image':
+                console.log('🚀 Dispatching to insertImage()');
                 this.insertImage(action);
                 break;
             case 'remove-image':
+                console.log('🚀 Dispatching to removeImage()');
                 this.removeImage(action);
                 break;
             default:
                 assertNever(action);
         }
+        console.log('✅ ActionManager.dispatch() - COMPLETE');
     }
 
     async updateStyle({ targets }: UpdateStyleAction) {
+        console.log('🎨 ActionManager.updateStyle() - CALLED');
+        console.log('📥 Targets to update:', targets);
+        
         const domEls: DomElement[] = [];
         for (const target of targets) {
+            console.log(`🎯 Processing target: ${target.domId}`);
+            console.log(`🎯 Target change:`, target.change);
+            
             const frameData = this.editorEngine.frames.get(target.frameId);
             if (!frameData) {
                 console.error('Failed to get frameView');
@@ -94,20 +125,29 @@ export class ActionManager {
             }
             const convertedChange = Object.fromEntries(
                 Object.entries(target.change.updated).map(([key, value]) => {
-                    const newValue = this.editorEngine.theme.getColorByName(value.value);
-                    if (value.type === StyleChangeType.Custom && newValue) {
-                        value.value = newValue;
-                    }
-                    if (value.type === StyleChangeType.Custom && !newValue) {
-                        value.value = '';
+                    if (value.type === StyleChangeType.Custom) {
+                        const resolved = this.editorEngine.theme.getColorByName(value.value);
+
+                        if (resolved) {
+                            value.value = resolved;
+                            value.type  = StyleChangeType.Value;
+                        } else if (/^(#|rgb|hsl)/i.test(value.value)) {
+                            value.type = StyleChangeType.Value;
+                        } else {
+                            console.warn(`Unknown design token: ${value.value}`);
+                        }
                     }
                     return [key, value];
                 }),
             );
             const change = {
-                original:target.change.original,
+                original: target.change.original,
                 updated: convertedChange,
             };
+            
+            console.log(`📝 Applying change to DOM:`, change);
+            console.log("stringified change", JSON.stringify(change));
+            console.log("frameData", frameData);
             // cloneDeep is used to avoid the issue of observable values can not pass through the webview
             const domEl = await frameData.view.updateStyle(target.domId, cloneDeep(change));
             if (!domEl) {
@@ -115,10 +155,12 @@ export class ActionManager {
                 continue;
             }
 
+            console.log(`✅ DOM updated, returned element styles:`, domEl.styles);
             domEls.push(domEl);
         }
 
         this.refreshDomElement(domEls);
+        console.log('✅ ActionManager.updateStyle() - COMPLETE');
     }
 
     debouncedRefreshDomElement(domEls: DomElement[]) {
